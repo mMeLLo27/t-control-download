@@ -15,6 +15,7 @@ say() { printf '\n\033[1;34m==>\033[0m %s\n' "$*"; }
 fail() { printf '\n\033[1;31mErro:\033[0m %s\n' "$*" >&2; exit 1; }
 
 TMP="$(mktemp -d)"
+profit_note=""
 trap 'rm -rf "$TMP"' EXIT
 
 desktop_dir() {
@@ -24,6 +25,36 @@ desktop_dir() {
   for dir in "$HOME/Desktop" "$HOME/Área de Trabalho" "$HOME/Área de trabalho"; do
     [ -d "$dir" ] && { echo "$dir"; return; }
   done
+}
+
+profit_app() {
+  # "Profit (T-Control)" na mesa: abre o Profit com a porta de leitura do T-Control. Se ele já estiver aberto
+  # sem a porta, pergunta se pode fechar e abrir de novo. Nunca derruba a instalação.
+  cat > "$TMP/profit.applescript" <<'APPLESCRIPT'
+set comPorta to (do shell script "curl -s -m 2 -o /dev/null http://127.0.0.1:9222/json/version && echo 1 || echo 0") is "1"
+if comPorta then
+	tell application "Profit" to activate
+	return
+end if
+set aberto to (do shell script "pgrep -x Profit >/dev/null && echo 1 || echo 0") is "1"
+if aberto then
+	set escolha to button returned of (display dialog "O Profit está aberto sem a porta de leitura do T-Control, que lê as operações sozinho. Fechar e abrir de novo com a porta? Depois é só conectar a conta outra vez." buttons {"Deixar como está", "Fechar e abrir de novo"} default button 2 with title "Profit")
+	if escolha is "Deixar como está" then return
+	tell application "Profit" to quit
+	repeat 20 times
+		if (do shell script "pgrep -x Profit >/dev/null && echo 1 || echo 0") is "0" then exit repeat
+		delay 0.5
+	end repeat
+end if
+do shell script "open -a Profit --args --remote-debugging-port=9222"
+APPLESCRIPT
+  rm -rf "$desk/Profit (T-Control).app"
+  if osacompile -o "$desk/Profit (T-Control).app" "$TMP/profit.applescript" 2>/dev/null; then
+    icns="/Applications/Profit.app/Contents/Resources/$(defaults read /Applications/Profit.app/Contents/Info CFBundleIconFile 2>/dev/null || echo icon)"
+    [ -f "$icns" ] || icns="$icns.icns"
+    [ -f "$icns" ] && cp "$icns" "$desk/Profit (T-Control).app/Contents/Resources/applet.icns" 2>/dev/null || true
+    profit_note=" Para a XP, abra o Profit pelo atalho \"Profit (T-Control)\" da mesa: as operações entram sozinhas."
+  fi
 }
 
 install_mac() {
@@ -51,9 +82,13 @@ install_mac() {
     ln -s "$target/T-Control.app" "$desk/T-Control"
   fi
 
+  if [ -d /Applications/Profit.app ] && [ -d "$desk" ]; then
+    profit_app  # Profit da XP instalado: atalho que o abre com a porta de leitura
+  fi
+
   say "Abrindo o T-Control"
   open "$target/T-Control.app"
-  echo "Pronto. O T-Control fica em $target e na área de trabalho; o ícone dele aparece na barra de menus, perto do relógio."
+  echo "Pronto. O T-Control fica em $target e na área de trabalho; o ícone dele aparece na barra de menus, perto do relógio.$profit_note"
 }
 
 install_linux() {
@@ -91,9 +126,31 @@ StartupNotify=false"
     command -v gio >/dev/null && gio set "$desk/t-control.desktop" metadata::trusted true 2>/dev/null || true
   fi
 
+  # Profit da XP instalado: ícone que o abre com a porta de leitura (coleta automática a cada 5 minutos)
+  profit_note=""
+  if [ -x /usr/lib/profit/Profit ] && [ -f "$app/_internal/scripts/linux/abrir-profit.sh" ]; then
+    chmod +x "$app/_internal/scripts/linux/abrir-profit.sh"
+    pentry="[Desktop Entry]
+Type=Application
+Name=Profit (T-Control)
+Comment=Abre o Profit com a porta de leitura do T-Control
+Exec=$app/_internal/scripts/linux/abrir-profit.sh
+Icon=profit
+Terminal=false
+Categories=Office;Finance;
+StartupNotify=true"
+    printf '%s\n' "$pentry" > "$HOME/.local/share/applications/profit-tcontrol.desktop"
+    if [ -n "$desk" ]; then
+      printf '%s\n' "$pentry" > "$desk/profit-tcontrol.desktop"
+      chmod +x "$desk/profit-tcontrol.desktop"
+      command -v gio >/dev/null && gio set "$desk/profit-tcontrol.desktop" metadata::trusted true 2>/dev/null || true
+    fi
+    profit_note=" Para a XP, abra o Profit pelo ícone \"Profit (T-Control)\": as operações entram sozinhas."
+  fi
+
   say "Abrindo o T-Control"
   nohup "$app/T-Control" >/dev/null 2>&1 &
-  echo "Pronto. O T-Control está no menu de aplicativos${desk:+ e na área de trabalho}. Para abrir pelo terminal: t-control"
+  echo "Pronto. O T-Control está no menu de aplicativos${desk:+ e na área de trabalho}. Para abrir pelo terminal: t-control.$profit_note"
 }
 
 case "$(uname -s)" in

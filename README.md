@@ -31,6 +31,16 @@ No Windows também dá para instalar por comando, no **PowerShell**:
 irm https://raw.githubusercontent.com/mMeLLo27/t-control-download/main/instalar.ps1 | iex
 ```
 
+### XP (Profit Pro)
+
+O T-Control traz as operações da XP de dois jeitos:
+
+- **Sozinho, a cada 5 minutos (Linux e macOS):** o instalador cria o ícone **Profit (T-Control)**, que abre o Profit com a porta de leitura. Com o Profit aberto por esse ícone e a conta conectada, as operações entram sem você fazer nada. No macOS o recurso é novo: se não funcionar, use o relatório. O T-Control só lê: nunca envia ordem nem vê a sua senha.
+- **Pelo relatório (Windows, e em qualquer sistema):**
+  1. No Profit, abra o menu **Roteamento → Relatório de Performance**.
+  2. Escolha a conta e o período, abra a aba **Operações** e clique em **Exportar** (gera um PDF).
+  3. No T-Control, vá em **Corretoras → Listar Corretoras → XP · Profit Pro → Enviar relatório** e escolha o arquivo.
+
 ### Avisos de segurança na primeira vez
 
 O T-Control não tem a assinatura paga da Microsoft nem da Apple, por isso os sistemas avisam:

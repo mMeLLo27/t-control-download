@@ -65,6 +65,14 @@ install_mac() {
   say "Baixando $file"
   curl -fL --progress-bar "$BASE/$file" -o "$TMP/$file" || fail "não consegui baixar $BASE/$file"
 
+  for old in "/Applications/T-Control.app" "$HOME/Applications/T-Control.app"; do  # atualização: backup antes de trocar
+    if [ -x "$old/Contents/MacOS/T-Control" ] && { [ -f "$old/Contents/Resources/backup-cli.txt" ] || [ -f "$old/Contents/Frameworks/backup-cli.txt" ]; }; then
+      say "Fazendo o backup antes de atualizar"
+      "$old/Contents/MacOS/T-Control" --backup antes-da-atualizacao || true
+      break
+    fi
+  done
+
   say "Instalando em Aplicativos"
   pkill -x T-Control 2>/dev/null || true
   mount="$(hdiutil attach -nobrowse -readonly "$TMP/$file" | awk -F'\t' '/\/Volumes\//{print $NF; exit}')"
@@ -99,6 +107,11 @@ install_linux() {
 
   say "Instalando na pasta do usuário"
   app="$HOME/.local/opt/T-Control"
+  if [ -x "$app/T-Control" ] && [ -f "$app/_internal/backup-cli.txt" ]; then  # atualização: backup antes de trocar
+    say "Fazendo o backup antes de atualizar"
+    if command -v timeout >/dev/null; then timeout 300 "$app/T-Control" --backup antes-da-atualizacao || true
+    else "$app/T-Control" --backup antes-da-atualizacao || true; fi
+  fi
   pkill -f "$app/T-Control" 2>/dev/null || true
   rm -rf "$app"
   mkdir -p "$HOME/.local/opt" "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/512x512/apps"
